@@ -1,12 +1,11 @@
 import axios from "axios";
 import * as cheerio from "cheerio";
 import { exportTraceState } from "next/dist/trace";
-import { extractPrice } from "../utils";
+import { extractPrice, extractCurrency, extractDescription } from "../utils";
 
 export async function scrapeAmazonProduct(url: string) {
     if(!url) return;
     
-    // curl --proxy brd.superproxy.io:22225 --proxy-user brd-customer-hl_46a511d7-zone-web_unlocker1:4lw3vj5h1ndr -k "https://geo.brdtest.com/mygeo.json"
     const username = String(process.env.BRIGHT_DATA_USERNAME);
     const password = String(process.env.BRIGHT_DATA_PASSWORD);
     const port = 2225;
@@ -37,7 +36,33 @@ export async function scrapeAmazonProduct(url: string) {
             $('#priceblock_dealprice'),
             $('.a-size-base.a-color-price')
         );
-        console.log(title, currentPrice, originalPrice);
+        const outOfStock = $('#availability span').text().trim().toLocaleLowerCase() === 'currently unavailable';
+        const images = 
+            $('#imgBlkFront').attr('data-a-dynamic-image') ||
+            $('#landingImage').attr('data-a-dynamic-image') ||
+            "{}"; 
+        const imageUrls = Object.keys(JSON.parse(images))
+        const currency = extractCurrency($('.a-price-symbol'))
+        const discountRate = $('.savingsPercentage').text().replace(/[-%]/g, "");
+        const description = extractDescription($)
+
+        const data = {
+            url,
+            currency: currency || '$',
+            image: imageUrls[0],
+            title,
+            currentPrice: Number(currentPrice) || Number(originalPrice),
+            originalPrice: Number(originalPrice) || Number(currentPrice),
+            priceHistory: [],
+            discountRate: Number(discountRate),
+            description: description,
+            reviewsCount: 100,
+            stars: 4.5,
+            isOutOfStock: outOfStock,
+            lowestPrice: Number(currentPrice) || Number(originalPrice),
+            highestPrice: Number(originalPrice) || Number(currentPrice)
+        }
+        return data;
         
     }
     catch(error: any) {
